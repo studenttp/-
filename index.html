@@ -7,7 +7,6 @@
   <title>روّاد الضرب 🚀</title>
   <link rel="stylesheet" href="style.css">
 </head>
-<script type="module" src="script.js"></script>
 <body>
   <header>
     <h1>🚀 روّاد الضرب</h1>
@@ -25,8 +24,14 @@
       </select>
 
       <div class="gender">
-        <label><input type="radio" name="avatar" value="girl" checked> 👩‍🚀 رائدة فضاء</label>
-        <label><input type="radio" name="avatar" value="boy"> 👨‍🚀 رائد فضاء</label>
+        <label>
+          <input type="radio" name="avatar" value="girl" checked>
+          👩‍🚀 رائدة فضاء
+        </label>
+        <label>
+          <input type="radio" name="avatar" value="boy">
+          👨‍🚀 رائد فضاء
+        </label>
       </div>
 
       <button id="startBtn">انطلق إلى الفضاء 🚀</button>
@@ -42,7 +47,9 @@
 
     <section id="quiz" class="panel hidden">
       <h2 id="quizTitle">🪐 تدريب الكوكب</h2>
-      <div class="progress"><div id="progressBar"></div></div>
+      <div class="progress">
+        <div id="progressBar"></div>
+      </div>
       <p id="questionCount"></p>
       <div id="question" class="question"></div>
       <div id="answers" class="answers"></div>
@@ -52,32 +59,55 @@
 
     <section id="teacher" class="panel hidden">
       <h2>👩‍🏫 غرفة قيادة المعلمة</h2>
+
       <div id="teacherLogin">
-        <p>أدخلي رمز المعلمة.</p>
-        <input id="teacherCode" type="password" placeholder="رمز الدخول">
+        <p>سجّلي الدخول بحساب المعلمة.</p>
+
+        <label for="teacherEmail">البريد الإلكتروني</label>
+        <input
+          id="teacherEmail"
+          type="email"
+          placeholder="البريد الإلكتروني"
+          autocomplete="username"
+        >
+
+        <label for="teacherCode">كلمة المرور</label>
+        <input
+          id="teacherCode"
+          type="password"
+          placeholder="كلمة المرور"
+          autocomplete="current-password"
+        >
+
         <button id="loginBtn">دخول</button>
-        <p id="loginMessage"></p>
+        <p id="loginMessage" aria-live="polite"></p>
       </div>
 
       <div id="teacherTools" class="hidden">
         <h3>إدارة الطلاب</h3>
+
         <div class="add-student">
           <input id="newStudent" placeholder="اسم الطالب الجديد">
           <button id="addBtn">إضافة الطالب</button>
         </div>
+
         <div id="studentList"></div>
 
         <h3>فتح الكواكب يدويًا</h3>
         <p>اختاري الطالب والكوكب الذي تريدين فتحه.</p>
+
         <label for="manageStudent">الطالب</label>
         <select id="manageStudent"></select>
+
         <label for="planetUnlock">الكوكب</label>
         <select id="planetUnlock"></select>
+
         <button id="unlockBtn">فتح الكوكب للطالب 🔓</button>
         <button id="lockBtn" class="secondary">قفل الكوكب 🔒</button>
 
         <h3>التقدم والنتائج</h3>
         <div id="report"></div>
+
         <button id="exportBtn" class="secondary">تصدير تقرير CSV</button>
         <button id="resetBtn" class="danger">إعادة تعيين تقدم الطالب</button>
         <button id="logoutBtn" class="secondary">تسجيل الخروج</button>
@@ -90,12 +120,15 @@
       <h2 id="certificateName"></h2>
       <p>لإكمال رحلة الكواكب واجتياز تحدي الضرب الشفوي.</p>
       <p>أنت نجم متألق في عالم الرياضيات! ⭐</p>
+
       <button onclick="window.print()">طباعة الشهادة 🖨️</button>
       <button id="returnJourney" class="secondary">العودة إلى الرحلة</button>
     </section>
   </main>
 
   <footer>✨ تعلّم، تدرّب، وانطلق نحو النجوم ✨</footer>
-  <script src="script.js"></script>
+
+  <!-- تحميل ملف JavaScript مرة واحدة فقط -->
+  <script type="module" src="script.js"></script>
 </body>
 </html>
