@@ -1,0 +1,100 @@
+
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>روّاد الضرب 🚀</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>🚀 روّاد الضرب</h1>
+    <p>رحلتك إلى النجوم تبدأ بجدول الضرب!</p>
+  </header>
+
+  <main>
+    <section id="home" class="panel">
+      <h2>🌟 أهلًا أيها الرائد!</h2>
+      <p>اختَر اسمك واستعد للانطلاق في الفضاء.</p>
+
+      <label for="student">اسم الطالب أو الطالبة</label>
+      <select id="student">
+        <option value="">اختَر اسمك</option>
+      </select>
+
+      <div class="gender">
+        <label><input type="radio" name="avatar" value="girl" checked> 👩‍🚀 رائدة فضاء</label>
+        <label><input type="radio" name="avatar" value="boy"> 👨‍🚀 رائد فضاء</label>
+      </div>
+
+      <button id="startBtn">انطلق إلى الفضاء 🚀</button>
+      <button class="secondary" id="teacherBtn">🔐 صفحة المعلمة</button>
+    </section>
+
+    <section id="journey" class="panel hidden">
+      <h2 id="welcome"></h2>
+      <p>اضغط على الكوكب المتاح لبدء التدريب.</p>
+      <div id="planets" class="planet-grid"></div>
+      <button class="secondary" id="backBtn">العودة للرئيسية</button>
+    </section>
+
+    <section id="quiz" class="panel hidden">
+      <h2 id="quizTitle">🪐 تدريب الكوكب</h2>
+      <div class="progress"><div id="progressBar"></div></div>
+      <p id="questionCount"></p>
+      <div id="question" class="question"></div>
+      <div id="answers" class="answers"></div>
+      <p id="feedback" aria-live="polite"></p>
+      <button id="nextBtn" class="hidden">السؤال التالي ➜</button>
+    </section>
+
+    <section id="teacher" class="panel hidden">
+      <h2>👩‍🏫 غرفة قيادة المعلمة</h2>
+      <div id="teacherLogin">
+        <p>أدخلي رمز المعلمة.</p>
+        <input id="teacherCode" type="password" placeholder="رمز الدخول">
+        <button id="loginBtn">دخول</button>
+        <p id="loginMessage"></p>
+      </div>
+
+      <div id="teacherTools" class="hidden">
+        <h3>إدارة الطلاب</h3>
+        <div class="add-student">
+          <input id="newStudent" placeholder="اسم الطالب الجديد">
+          <button id="addBtn">إضافة الطالب</button>
+        </div>
+        <div id="studentList"></div>
+
+        <h3>فتح الكواكب يدويًا</h3>
+        <p>اختاري الطالب والكوكب الذي تريدين فتحه.</p>
+        <label for="manageStudent">الطالب</label>
+        <select id="manageStudent"></select>
+        <label for="planetUnlock">الكوكب</label>
+        <select id="planetUnlock"></select>
+        <button id="unlockBtn">فتح الكوكب للطالب 🔓</button>
+        <button id="lockBtn" class="secondary">قفل الكوكب 🔒</button>
+
+        <h3>التقدم والنتائج</h3>
+        <div id="report"></div>
+        <button id="exportBtn" class="secondary">تصدير تقرير CSV</button>
+        <button id="resetBtn" class="danger">إعادة تعيين تقدم الطالب</button>
+        <button id="logoutBtn" class="secondary">تسجيل الخروج</button>
+      </div>
+    </section>
+
+    <section id="certificate" class="panel certificate hidden">
+      <h2>🏆 شهادة رائد الضرب المتميز 🏆</h2>
+      <p>تهانينا للرائد أو الرائدة</p>
+      <h2 id="certificateName"></h2>
+      <p>لإكمال رحلة الكواكب واجتياز تحدي الضرب الشفوي.</p>
+      <p>أنت نجم متألق في عالم الرياضيات! ⭐</p>
+      <button onclick="window.print()">طباعة الشهادة 🖨️</button>
+      <button id="returnJourney" class="secondary">العودة إلى الرحلة</button>
+    </section>
+  </main>
+
+  <footer>✨ تعلّم، تدرّب، وانطلق نحو النجوم ✨</footer>
+  <script src="script.js"></script>
+</body>
+</html>
