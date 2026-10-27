@@ -761,3 +761,395 @@ function startRosterListener() {
     }
   );
 }
+// عرض قائمة الطلاب في لوحة المعلمة
+function renderStudentList() {
+  const container = $("studentList");
+  if (!container) return;
+
+  container.innerHTML = "";
+
+  data.students.forEach(name => {
+    const row = document.createElement("div");
+    row.className = "student-row";
+
+    const label = document.createElement("span");
+    label.textContent = name;
+
+    const remove = document.createElement("button");
+    remove.textContent = "حذف الطالب 🗑️";
+
+    remove.addEventListener("click", async () => {
+      if (!teacherSignedIn) {
+        alert("يجب تسجيل دخول المعلمة أولًا.");
+        return;
+      }
+
+      if (!confirm(`هل تريدين حذف الطالب ${name}؟`)) {
+        return;
+      }
+
+      try {
+        await deleteDoc(
+          doc(db, "students", encodeURIComponent(name))
+        );
+
+        delete data.progress[name];
+
+        if (currentStudent === name) {
+          currentStudent = "";
+          cloudReadyFor = "";
+          show("home");
+        }
+
+        saveData();
+      } catch (e) {
+        console.error(e);
+        alert("تعذر حذف الطالب. تحققي من صلاحيات Firestore.");
+      }
+    });
+
+    row.appendChild(label);
+    row.appendChild(remove);
+    container.appendChild(row);
+  });
+}
+
+// إضافة طالب جديد
+if ($("addBtn")) {
+  $("addBtn").addEventListener("click", async () => {
+    if (!teacherSignedIn) {
+      alert("يجب تسجيل دخول المعلمة أولًا.");
+      return;
+    }
+
+    const input = $("newStudent");
+    const name = input.value.trim();
+
+    if (!name) {
+      alert("اكتبي اسم الطالب أولًا.");
+      return;
+    }
+
+    if (data.students.includes(name)) {
+      alert("هذا الطالب موجود بالفعل.");
+      return;
+    }
+
+    try {
+      await setDoc(
+        doc(db, "students", encodeURIComponent(name)),
+        {
+          name,
+          createdAt: new Date().toISOString()
+        }
+      );
+
+      ensureProgress(name);
+
+      input.value = "";
+      alert("تمت إضافة الطالب بنجاح ✅");
+    } catch (e) {
+      console.error(e);
+      alert("تعذرت إضافة الطالب. تحققي من قواعد Firestore.");
+    }
+  });
+}
+
+// اختيار طالب لإدارة تقدمه
+if ($("manageStudent")) {
+  $("manageStudent").addEventListener("change", async () => {
+    const name = $("manageStudent").value;
+
+    if (!name) return;
+
+    try {
+      const snap = await getDoc(progressRef(name));
+
+      if (snap.exists()) {
+        const p = snap.data();
+
+        data.progress[name] = {
+          unlocked: Array.isArray(p.unlocked) ? p.unlocked : [0],
+          completed: Array.isArray(p.completed) ? p.completed : [],
+          scores: p.scores || {},
+          oralPassed: p.oralPassed === true
+        };
+      } else {
+        ensureProgress(name);
+      }
+
+      renderUnlockMenu(name);
+      renderReport(name);
+    } catch (e) {
+      console.error(e);
+      alert("تعذر تحميل تقدم الطالب.");
+    }
+  });
+}
+
+function renderUnlockMenu(name) {
+  const select = $("planetUnlock");
+  if (!select) return;
+
+  select.innerHTML = "";
+
+  planetsData.forEach((planet, i) => {
+    const option = document.createElement("option");
+
+    option.value = String(i);
+    option.textContent =
+      `${planet.emoji} ${planet.name} — جدول ${planet.table}`;
+
+    select.appendChild(option);
+  });
+}
+
+// فتح كوكب لطالب
+if ($("unlockBtn")) {
+  $("unlockBtn").addEventListener("click", async () => {
+    if (!teacherSignedIn) {
+      alert("يجب تسجيل دخول المعلمة أولًا.");
+      return;
+    }
+
+    const name = $("manageStudent").value;
+    const index = Number($("planetUnlock").value);
+
+    if (!name || !Number.isInteger(index) || index < 0 || index >= 10) {
+      alert("اختاري الطالب والكوكب.");
+      return;
+    }
+
+    const p = ensureProgress(name);
+
+    if (!p.unlocked.includes(index)) {
+      p.unlocked.push(index);
+    }
+
+    p.unlocked.sort((a, b) => a - b);
+
+    try {
+      await saveStudentProgress(name);
+      alert("تم فتح الكوكب بنجاح 🔓");
+      renderReport(name);
+
+      if (name === currentStudent) renderPlanets();
+    } catch (e) {
+      console.error(e);
+      alert("تعذر حفظ التعديل في Firebase.");
+    }
+  });
+}
+
+// إغلاق كوكب لطالب
+if ($("lockBtn")) {
+  $("lockBtn").addEventListener("click", async () => {
+    if (!teacherSignedIn) {
+      alert("يجب تسجيل دخول المعلمة أولًا.");
+      return;
+    }
+
+    const name = $("manageStudent").value;
+    const index = Number($("planetUnlock").value);
+
+    if (!name || !Number.isInteger(index) || index < 0 || index >= 10) {
+      alert("اختاري الطالب والكوكب.");
+      return;
+    }
+
+    if (index === 0) {
+      alert("لا يمكن إغلاق الكوكب الأول.");
+      return;
+    }
+
+    const p = ensureProgress(name);
+
+    p.unlocked = p.unlocked.filter(i => i !== index);
+
+    try {
+      await saveStudentProgress(name);
+      alert("تم إغلاق الكوكب 🔒");
+      renderReport(name);
+
+      if (name === currentStudent) renderPlanets();
+    } catch (e) {
+      console.error(e);
+      alert("تعذر حفظ التعديل في Firebase.");
+    }
+  });
+}
+
+async function saveStudentProgress(name) {
+  const p = ensureProgress(name);
+
+  await setDoc(progressRef(name), {
+    unlocked: p.unlocked,
+    completed: p.completed,
+    scores: p.scores,
+    oralPassed: p.oralPassed,
+    updatedAt: new Date().toISOString()
+  });
+
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  } catch (e) {
+    console.warn(e);
+  }
+}
+
+// تقرير تقدم طالب
+function renderReport(name) {
+  const container = $("report");
+  if (!container) return;
+
+  const p = ensureProgress(name);
+
+  container.innerHTML = `
+    <h3>تقرير الطالب: ${escapeHTML(name)}</h3>
+    <p>الكواكب المفتوحة: ${p.unlocked.length} من 10</p>
+    <p>الكواكب المكتملة: ${p.completed.length} من 10</p>
+    <p>التحدي الشفوي: ${p.oralPassed ? "مجتاز ✓" : "لم يجتز بعد"}</p>
+    <h4>النتائج</h4>
+    <ul>
+      ${planetsData.map((planet, i) => `
+        <li>
+          ${planet.name}:
+          ${p.scores[i] === undefined ? "لم يُختبر بعد" : `${p.scores[i]} من 10`}
+        </li>
+      `).join("")}
+    </ul>
+  `;
+}
+
+function escapeHTML(value) {
+  return String(value).replace(/[&<>"']/g, char => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;"
+  })[char]);
+}
+
+// تصدير تقارير جميع الطلاب إلى CSV
+if ($("exportBtn")) {
+  $("exportBtn").addEventListener("click", async () => {
+    if (!teacherSignedIn) {
+      alert("يجب تسجيل دخول المعلمة أولًا.");
+      return;
+    }
+
+    try {
+      const rows = [[
+        "اسم الطالب",
+        "الكواكب المفتوحة",
+        "الكواكب المكتملة",
+        ...planetsData.map(p => `نتيجة ${p.name}`),
+        "التحدي الشفوي"
+      ]];
+
+      for (const name of data.students) {
+        const snap = await getDoc(progressRef(name));
+
+        const p = snap.exists()
+          ? snap.data()
+          : ensureProgress(name);
+
+        rows.push([
+          name,
+          (p.unlocked || []).length,
+          (p.completed || []).length,
+          ...planetsData.map((_, i) =>
+            p.scores && p.scores[i] !== undefined
+              ? p.scores[i]
+              : ""
+          ),
+          p.oralPassed ? "مجتاز" : "غير مجتاز"
+        ]);
+      }
+
+      const csv = "\uFEFF" + rows.map(row =>
+        row.map(value =>
+          `"${String(value).replace(/"/g, '""')}"`
+        ).join(",")
+      ).join("\r\n");
+
+      const blob = new Blob([csv], {
+        type: "text/csv;charset=utf-8;"
+      });
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+
+      a.href = url;
+      a.download = "تقرير-رواد-الضرب.csv";
+      a.click();
+
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error(e);
+      alert("تعذر إنشاء التقرير.");
+    }
+  });
+}
+
+// إعادة تعيين تقدم طالب
+if ($("resetBtn")) {
+  $("resetBtn").addEventListener("click", async () => {
+    if (!teacherSignedIn) {
+      alert("يجب تسجيل دخول المعلمة أولًا.");
+      return;
+    }
+
+    const name = $("manageStudent").value;
+
+    if (!name) {
+      alert("اختاري الطالب أولًا.");
+      return;
+    }
+
+    if (!confirm(`هل تريدين إعادة تعيين تقدم ${name}؟`)) {
+      return;
+    }
+
+    data.progress[name] = {
+      unlocked: [0],
+      completed: [],
+      scores: {},
+      oralPassed: false
+    };
+
+    try {
+      await saveStudentProgress(name);
+      alert("تمت إعادة تعيين التقدم.");
+
+      renderReport(name);
+
+      if (name === currentStudent) renderPlanets();
+    } catch (e) {
+      console.error(e);
+      alert("تعذر حفظ إعادة التعيين.");
+    }
+  });
+}
+
+// تسجيل الخروج
+if ($("logoutBtn")) {
+  $("logoutBtn").addEventListener("click", async () => {
+    try {
+      await signOut(auth);
+      show("home");
+      showMessage("");
+    } catch (e) {
+      console.error(e);
+      alert("تعذر تسجيل الخروج.");
+    }
+  });
+}
+
+// تهيئة الصفحة
+refreshStudentMenus();
+
+if ($("studentList")) {
+  renderStudentList();
+}
