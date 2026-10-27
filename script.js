@@ -27,7 +27,7 @@ const firebaseConfig = {
 };
 
 // اكتبي بريد حساب المعلمة الذي أنشأتِه في Firebase
-const TEACHER_EMAIL = "ضعي-بريد-المعلمة-هنا";
+const TEACHER_EMAIL = "maather1888@gmail.com";
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
