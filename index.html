@@ -61,25 +61,18 @@
       <h2>👩‍🏫 غرفة قيادة المعلمة</h2>
 
       <div id="teacherLogin">
-        <p>سجّلي الدخول بحساب المعلمة.</p>
+        <p>أدخلي الرمز السري للمعلمة.</p>
 
-        <label for="teacherEmail">البريد الإلكتروني</label>
-        <input
-          id="teacherEmail"
-          type="email"
-          placeholder="البريد الإلكتروني"
-          autocomplete="username"
-        >
-
-        <label for="teacherCode">كلمة المرور</label>
+        <label for="teacherCode">الرمز السري</label>
         <input
           id="teacherCode"
           type="password"
-          placeholder="كلمة المرور"
+          placeholder="أدخلي الرمز السري"
           autocomplete="current-password"
+          aria-label="الرمز السري للمعلمة"
         >
 
-        <button id="loginBtn">دخول</button>
+        <button id="loginBtn" type="button">دخول</button>
         <p id="loginMessage" aria-live="polite"></p>
       </div>
 
@@ -128,7 +121,6 @@
 
   <footer>✨ تعلّم، تدرّب، وانطلق نحو النجوم ✨</footer>
 
-  <!-- تحميل ملف JavaScript مرة واحدة فقط -->
   <script type="module" src="script.js"></script>
 </body>
 </html>
