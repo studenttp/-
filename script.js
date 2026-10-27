@@ -1,4 +1,38 @@
 
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+import {
+  getAuth,
+  signInWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged
+} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
+import {
+  getFirestore,
+  collection,
+  doc,
+  setDoc,
+  deleteDoc,
+  onSnapshot
+} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+
+// إعدادات Firebase الخاصة بمشروعك
+const firebaseConfig = {
+  apiKey: "AIzaSyCZGRVBgZMSj8phapBIz1duuM7zxvSKE90",
+  authDomain: "rowad-aldarb.firebaseapp.com",
+  projectId: "rowad-aldarb",
+  storageBucket: "rowad-aldarb.firebasestorage.app",
+  messagingSenderId: "844956188514",
+  appId: "1:844956188514:web:1f7f90ead7b7f7a2aaf63b",
+  measurementId: "G-X1KKYNFKJW"
+};
+
+// اكتبي بريد حساب المعلمة الذي أنشأتِه في Firebase
+const TEACHER_EMAIL = "ضعي-بريد-المعلمة-هنا";
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
 const $ = id => document.getElementById(id);
 
 const planetsData = [
@@ -15,6 +49,7 @@ const planetsData = [
 ];
 
 const STORAGE_KEY = "rowad_aldarb_v1";
+
 let data = loadData();
 let currentStudent = "";
 let currentPlanet = 0;
@@ -23,21 +58,30 @@ let questionIndex = 0;
 let score = 0;
 let answered = false;
 let currentAvatar = "girl";
+let teacherSignedIn = false;
+let rosterUnsubscribe = null;
 
 function loadData() {
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
     if (saved && saved.students && saved.progress) return saved;
   } catch (e) {}
+
   return {
     students: [],
     progress: {},
-    teacherCode: "2468"
+    teacherCode: ""
   };
 }
 
+// يحفظ التقدم محليًا مؤقتًا.
+// قائمة الأسماء المشتركة مصدرها Firestore.
 function saveData() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  } catch (e) {
+    console.warn("تعذر الحفظ المحلي:", e);
+  }
 }
 
 function ensureProgress(name) {
@@ -55,7 +99,12 @@ function ensureProgress(name) {
 function show(section) {
   ["home", "journey", "quiz", "teacher", "certificate"]
     .forEach(id => $(id).classList.add("hidden"));
+
   $(section).classList.remove("hidden");
+}
+
+function showMessage(message) {
+  $("loginMessage").textContent = message;
 }
 
 function refreshStudentMenus() {
@@ -70,6 +119,7 @@ function refreshStudentMenus() {
     first.textContent = menu.id === "student"
       ? "اختَر اسمك"
       : "اختَر الطالب";
+
     menu.appendChild(first);
 
     data.students.forEach(name => {
@@ -79,12 +129,15 @@ function refreshStudentMenus() {
       menu.appendChild(option);
     });
 
-    if (data.students.includes(oldValue)) menu.value = oldValue;
+    if (data.students.includes(oldValue)) {
+      menu.value = oldValue;
+    }
   });
 }
 
 function renderPlanets() {
   const progress = ensureProgress(currentStudent);
+
   $("welcome").textContent =
     `${currentAvatar === "girl" ? "👩‍🚀" : "👨‍🚀"} أهلًا ${currentStudent}!`;
 
@@ -113,7 +166,6 @@ function renderPlanets() {
     container.appendChild(button);
   });
 
-  const allDone = progress.completed.length === 10;
   const oralButton = document.createElement("button");
   oralButton.className = "planet";
   oralButton.innerHTML = `
@@ -121,7 +173,10 @@ function renderPlanets() {
     <strong>محطة التحدي الشفوي</strong>
     <div>${progress.oralPassed ? "اجتزت التحدي ✓" : "اختبار المعلمة"}</div>
   `;
-  oralButton.disabled = !allDone || progress.oralPassed;
+
+  oralButton.disabled =
+    progress.completed.length !== 10 || progress.oralPassed;
+
   oralButton.addEventListener("click", oralTest);
   container.appendChild(oralButton);
 
@@ -130,13 +185,16 @@ function renderPlanets() {
     certificateButton.className = "planet done";
     certificateButton.innerHTML =
       '<span class="emoji">🏆</span><strong>شهادتي</strong>';
+
     certificateButton.addEventListener("click", showCertificate);
     container.appendChild(certificateButton);
   }
 }
 
+// دخول الطالب
 $("startBtn").addEventListener("click", () => {
   currentStudent = $("student").value;
+
   if (!currentStudent) {
     alert("اختَر اسمك أولًا!");
     return;
@@ -162,7 +220,6 @@ function startQuiz(index) {
   const table = planetsData[index].table;
   const factors = Array.from({ length: 10 }, (_, i) => i + 1);
 
-  // ترتيب عشوائي للأسئلة
   factors.sort(() => Math.random() - 0.5);
 
   questions = factors.map(factor => ({
@@ -197,7 +254,10 @@ function renderQuestion() {
   while (options.size < 4) {
     const offset = Math.floor(Math.random() * 11) - 5;
     const value = q.answer + offset;
-    if (value >= 0 && value !== q.answer) options.add(value);
+
+    if (value >= 0 && value !== q.answer) {
+      options.add(value);
+    }
   }
 
   const shuffled = [...options].sort(() => Math.random() - 0.5);
@@ -222,7 +282,8 @@ function renderQuestion() {
         $("feedback").textContent = "أحسنت! إجابة صحيحة ⭐";
       } else {
         button.style.background = "#ffb4b4";
-        $("feedback").textContent = `حاول مرة أخرى في المرة القادمة. الإجابة: ${q.answer}`;
+        $("feedback").textContent =
+          `حاول مرة أخرى في المرة القادمة. الإجابة: ${q.answer}`;
       }
 
       $("questionCount").textContent =
@@ -253,20 +314,17 @@ $("nextBtn").addEventListener("click", () => {
   const progress = ensureProgress(currentStudent);
   progress.scores[currentPlanet] = score;
 
-  // اجتياز الكوكب يحتاج 8 إجابات صحيحة على الأقل من 10
   if (score >= 8) {
     if (!progress.completed.includes(currentPlanet)) {
       progress.completed.push(currentPlanet);
     }
 
-    const next = currentPlanet + 1;
-
-    // فتح المرحلة التالية لا يحدث تلقائيًا؛ المعلمة تتحكم به.
     $("feedback").textContent =
       "رائع! حققت نتيجة النجاح. انتظر موافقة المعلمة لفتح الكوكب التالي.";
   } else {
     $("feedback").textContent =
       "تحتاج إلى 8 إجابات صحيحة على الأقل. تدرب وحاول مجددًا!";
+
     progress.completed = progress.completed.filter(
       i => i !== currentPlanet
     );
@@ -279,42 +337,48 @@ $("nextBtn").addEventListener("click", () => {
 
   const back = document.createElement("button");
   back.textContent = "العودة إلى الكواكب 🪐";
+
   back.addEventListener("click", () => {
     renderPlanets();
     show("journey");
   });
+
   $("answers").appendChild(back);
 });
 
 function oralTest() {
-  const questions = [
+  const oralQuestions = [
     [2, 3], [4, 5], [6, 7], [8, 3], [9, 4]
   ];
+
   let index = 0;
   let correct = 0;
 
   function ask() {
-    if (index >= questions.length) {
+    if (index >= oralQuestions.length) {
       const pass = correct >= 4;
       const progress = ensureProgress(currentStudent);
 
       if (pass) progress.oralPassed = true;
 
       saveData();
+
       alert(
         `انتهى التحدي الشفوي!\nالنتيجة: ${correct} من 5\n` +
-        (pass ? "مبروك! اجتزت التحدي 🎉" :
-          "تحتاج إلى 4 إجابات صحيحة. يمكنك المحاولة مجددًا.")
+        (pass
+          ? "مبروك! اجتزت التحدي 🎉"
+          : "تحتاج إلى 4 إجابات صحيحة. يمكنك المحاولة مجددًا.")
       );
 
       renderPlanets();
 
       if (pass) showCertificate();
       else show("journey");
+
       return;
     }
 
-    const [a, b] = questions[index];
+    const [a, b] = oralQuestions[index];
     const response = prompt(
       `السؤال ${index + 1} من 5:\nكم يساوي ${a} × ${b}؟`
     );
@@ -340,21 +404,45 @@ $("returnJourney").addEventListener("click", () => {
   show("journey");
 });
 
+// صفحة المعلمة
 $("teacherBtn").addEventListener("click", () => {
+  showMessage("");
+
   $("teacherLogin").classList.remove("hidden");
   $("teacherTools").classList.add("hidden");
+
+  $("teacherEmail").value = "";
   $("teacherCode").value = "";
-  $("loginMessage").textContent = "";
+
   show("teacher");
 });
 
-$("loginBtn").addEventListener("click", () => {
-  if ($("teacherCode").value === data.teacherCode) {
-    $("teacherLogin").classList.add("hidden");
-    $("teacherTools").classList.remove("hidden");
-    renderTeacher();
-  } else {
-    $("loginMessage").textContent = "الرمز غير صحيح.";
+// تسجيل الدخول الحقيقي عبر Firebase Authentication
+$("loginBtn").addEventListener("click", async () => {
+  const email = $("teacherEmail").value.trim();
+  const password = $("teacherCode").value;
+
+  if (!email || !password) {
+    showMessage("أدخلي البريد الإلكتروني وكلمة المرور.");
+    return;
+  }
+
+  if (email.toLowerCase() !== TEACHER_EMAIL.toLowerCase()) {
+    showMessage("هذا البريد ليس حساب المعلمة المصرّح به.");
+    return;
+  }
+
+  $("loginBtn").disabled = true;
+  showMessage("جارٍ تسجيل الدخول...");
+
+  try {
+    await signInWithEmailAndPassword(auth, email, password);
+    showMessage("تم تسجيل الدخول.");
+  } catch (error) {
+    console.error(error);
+    showMessage("تعذر تسجيل الدخول. تحققي من البريد وكلمة المرور وإعدادات Firebase.");
+  } finally {
+    $("loginBtn").disabled = false;
   }
 });
 
@@ -362,6 +450,7 @@ function renderTeacher() {
   refreshStudentMenus();
 
   $("planetUnlock").innerHTML = "";
+
   planetsData.forEach((planet, index) => {
     const option = document.createElement("option");
     option.value = index;
@@ -373,7 +462,38 @@ function renderTeacher() {
   renderReport();
 }
 
-$("addBtn").addEventListener("click", () => {
+// متابعة قائمة الطلاب المشتركة لحظيًا
+function listenToStudents() {
+  if (rosterUnsubscribe) rosterUnsubscribe();
+
+  rosterUnsubscribe = onSnapshot(
+    collection(db, "students"),
+    snapshot => {
+      data.students = snapshot.docs
+        .map(item => item.data().name)
+        .filter(name => typeof name === "string" && name.trim())
+        .sort((a, b) => a.localeCompare(b, "ar"));
+
+      data.students.forEach(ensureProgress);
+      saveData();
+      refreshStudentMenus();
+      renderStudentList();
+      renderReport();
+    },
+    error => {
+      console.error("خطأ في قراءة قائمة الطلاب:", error);
+      alert("تعذر تحميل أسماء الطلاب من Firebase. تحققي من قواعد Firestore.");
+    }
+  );
+}
+
+// إضافة طالب إلى Firestore
+$("addBtn").addEventListener("click", async () => {
+  if (!auth.currentUser || !teacherSignedIn) {
+    alert("سجّلي دخول المعلمة أولًا.");
+    return;
+  }
+
   const name = $("newStudent").value.trim();
 
   if (!name) {
@@ -386,12 +506,21 @@ $("addBtn").addEventListener("click", () => {
     return;
   }
 
-  data.students.push(name);
-  ensureProgress(name);
-  saveData();
+  try {
+    const studentId = encodeURIComponent(name);
 
-  $("newStudent").value = "";
-  renderTeacher();
+    await setDoc(doc(db, "students", studentId), {
+      name,
+      createdAt: new Date().toISOString()
+    });
+
+    ensureProgress(name);
+    saveData();
+    $("newStudent").value = "";
+  } catch (error) {
+    console.error(error);
+    alert("لم تتم إضافة الطالب. تحققي من تسجيل الدخول وقواعد Firestore.");
+  }
 });
 
 function renderStudentList() {
@@ -414,13 +543,25 @@ function renderStudentList() {
     remove.textContent = "حذف الطالب";
     remove.className = "danger";
 
-    remove.addEventListener("click", () => {
-      if (!confirm(`هل تريدين حذف ${name} وتقدمه؟`)) return;
+    remove.addEventListener("click", async () => {
+      if (!auth.currentUser || !teacherSignedIn) {
+        alert("سجّلي دخول المعلمة أولًا.");
+        return;
+      }
 
-      data.students = data.students.filter(s => s !== name);
-      delete data.progress[name];
-      saveData();
-      renderTeacher();
+      if (!confirm(`هل تريدين حذف ${name} وتقدمه المحلي؟`)) return;
+
+      try {
+        await deleteDoc(
+          doc(db, "students", encodeURIComponent(name))
+        );
+
+        delete data.progress[name];
+        saveData();
+      } catch (error) {
+        console.error(error);
+        alert("تعذر حذف الطالب. تحققي من صلاحيات Firebase.");
+      }
     });
 
     row.append(label, remove);
@@ -430,7 +571,6 @@ function renderStudentList() {
 
 function updateUnlock() {
   const name = $("manageStudent").value;
-  const index = Number($("planetUnlock").value);
 
   if (!name) {
     alert("اختاري الطالب أولًا.");
@@ -441,6 +581,11 @@ function updateUnlock() {
 }
 
 $("unlockBtn").addEventListener("click", () => {
+  if (!teacherSignedIn) {
+    alert("سجّلي دخول المعلمة أولًا.");
+    return;
+  }
+
   const progress = updateUnlock();
   if (!progress) return;
 
@@ -453,19 +598,25 @@ $("unlockBtn").addEventListener("click", () => {
 
   saveData();
   renderTeacher();
-  alert("تم فتح الكوكب للطالب المحدد.");
+  alert("تم فتح الكوكب محليًا لهذا الطالب.");
 });
 
 $("lockBtn").addEventListener("click", () => {
+  if (!teacherSignedIn) {
+    alert("سجّلي دخول المعلمة أولًا.");
+    return;
+  }
+
   const progress = updateUnlock();
   if (!progress) return;
 
   const index = Number($("planetUnlock").value);
 
   progress.unlocked = progress.unlocked.filter(i => i !== index);
+
   saveData();
   renderTeacher();
-  alert("تم قفل الكوكب.");
+  alert("تم قفل الكوكب محليًا لهذا الطالب.");
 });
 
 function renderReport() {
@@ -491,10 +642,13 @@ function renderReport() {
 }
 
 $("exportBtn").addEventListener("click", () => {
-  const rows = [["اسم الطالب", "الكواكب المكتملة", "نتائج الجداول", "التحدي الشفوي"]];
+  const rows = [
+    ["اسم الطالب", "الكواكب المكتملة", "نتائج الجداول", "التحدي الشفوي"]
+  ];
 
   data.students.forEach(name => {
     const p = ensureProgress(name);
+
     rows.push([
       name,
       `${p.completed.length}/10`,
@@ -517,13 +671,20 @@ $("exportBtn").addEventListener("click", () => {
 
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
+
   link.href = url;
   link.download = "rowad-aldarb-report.csv";
   link.click();
+
   URL.revokeObjectURL(url);
 });
 
 $("resetBtn").addEventListener("click", () => {
+  if (!teacherSignedIn) {
+    alert("سجّلي دخول المعلمة أولًا.");
+    return;
+  }
+
   const name = $("manageStudent").value;
 
   if (!name) {
@@ -531,7 +692,9 @@ $("resetBtn").addEventListener("click", () => {
     return;
   }
 
-  if (!confirm(`هل تريدين إعادة تعيين تقدم ${name}؟`)) return;
+  if (!confirm(`هل تريدين إعادة تعيين تقدم ${name} على هذا الجهاز؟`)) {
+    return;
+  }
 
   data.progress[name] = {
     unlocked: [0],
@@ -544,9 +707,61 @@ $("resetBtn").addEventListener("click", () => {
   renderTeacher();
 });
 
-$("logoutBtn").addEventListener("click", () => {
-  show("home");
+$("logoutBtn").addEventListener("click", async () => {
+  try {
+    await signOut(auth);
+    show("home");
+  } catch (error) {
+    console.error(error);
+    alert("تعذر تسجيل الخروج.");
+  }
 });
 
-// تهيئة الموقع عند فتحه
+// مراقبة حالة حساب المعلمة
+onAuthStateChanged(auth, user => {
+  teacherSignedIn = Boolean(
+    user &&
+    user.email &&
+    user.email.toLowerCase() === TEACHER_EMAIL.toLowerCase()
+  );
+
+  if (teacherSignedIn) {
+    $("teacherLogin").classList.add("hidden");
+    $("teacherTools").classList.remove("hidden");
+
+    listenToStudents();
+    renderTeacher();
+  } else {
+    if (rosterUnsubscribe) {
+      rosterUnsubscribe();
+      rosterUnsubscribe = null;
+    }
+
+    $("teacherLogin").classList.remove("hidden");
+    $("teacherTools").classList.add("hidden");
+
+    // قراءة قائمة الأسماء للطلاب من قاعدة البيانات.
+    // تتطلب قواعد Firestore السماح بالقراءة العامة لهذه المجموعة.
+    if (!rosterUnsubscribe) {
+      rosterUnsubscribe = onSnapshot(
+        collection(db, "students"),
+        snapshot => {
+          data.students = snapshot.docs
+            .map(item => item.data().name)
+            .filter(name => typeof name === "string" && name.trim())
+            .sort((a, b) => a.localeCompare(b, "ar"));
+
+          data.students.forEach(ensureProgress);
+          saveData();
+          refreshStudentMenus();
+        },
+        error => {
+          console.error("تعذر تحميل قائمة الطلاب:", error);
+        }
+      );
+    }
+  }
+});
+
+// تهيئة الواجهة
 refreshStudentMenus();
